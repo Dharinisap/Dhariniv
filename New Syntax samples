@@ -1,0 +1,145 @@
+lt_aggr1 = VALUE #( FOR groups <fs_grp1> OF <fs_grp> IN t_out_data GROUP BY
+                         ( mandt = <fs_grp>-mandt plant = <fs_grp>-werks material = <fs_grp>-matnr
+                           warehouse_code = <fs_grp>-lgort warehouse_loc = <fs_grp>-lgpla
+                           batch_no = <fs_grp>-charg item_no = <fs_grp>-atwrt product_name = <fs_grp>-maktx )
+                       LET coll_line = REDUCE #( INIT line TYPE ty_tab FOR <fs_grp2> IN GROUP <fs_grp1>
+                       NEXT line-mandt = <fs_grp2>-mandt line-werks = <fs_grp2>-werks line-matnr = <fs_grp2>-matnr
+                            line-atwrt = <fs_grp2>-atwrt line-lgort = <fs_grp2>-lgort
+                            line-lgnum = <fs_grp2>-lgnum line-maktx = <fs_grp2>-maktx
+                            line-charg = <fs_grp2>-charg
+                            line-lgpla = <fs_grp2>-lgpla
+                            line-gesme = line-gesme + <fs_grp2>-gesme )
+                      IN ( coll_line ) ) .
+
+       lt_aggr = CORRESPONDING #( lt_aggr1 MAPPING mandt = mandt plant = werks jabil_mat_no = matnr
+                                                    warehouse_code = lgort  warehouse_loc = lgpla "warehouse_loc = lgnum
+                                                    batch_no = charg  item_no = atwrt
+                                                    product_name = maktx  daily_inventory = gesme ).
+
+       IF sy-subrc = 0.
+          t_tab_tmp[] = CORRESPONDING #( lt_tab[] ).
+
+         DATA(t_no_exist) = FILTER #( lt_aggr USING KEY sort_key EXCEPT IN t_tab_tmp
+                                    WHERE mandt = mandt AND plant           = plant
+                                                        AND jabil_mat_no    = jabil_mat_no
+                                                        AND warehouse_code  = warehouse_code
+                                                        AND warehouse_loc   = warehouse_loc
+                                                       " AND item_no         = item_no TR DEVK9C4SPI
+                                                       " AND product_name    = product_name  TR DEVK9C4SPI
+                                                        AND batch_no = batch_no ).
+       IF t_no_exist IS NOT INITIAL. "update change by fields
+         t_final = VALUE #( FOR <fs_no_exist1> IN t_no_exist
+                                    daily_inventory = <fs_no_exist1>-daily_inventory
+                                    item_no         = <fs_no_exist1>-item_no
+                                    product_name    = <fs_no_exist1>-product_name
+                                    changed_by   = sy-uname
+                                    changed_date = sy-datum
+                                    changed_time = sy-uzeit  ( mandt = <fs_no_exist1>-mandt
+                                                              plant           = <fs_no_exist1>-plant
+                                                              jabil_mat_no    = <fs_no_exist1>-jabil_mat_no
+                                                              warehouse_code  = <fs_no_exist1>-warehouse_code
+                                                              warehouse_loc   = <fs_no_exist1>-warehouse_loc
+                                                              batch_no        = <fs_no_exist1>-batch_no ) ). 
+
+
+         DATA(t_exist) = FILTER #( lt_aggr USING KEY sort_key IN t_tab_tmp
+                                      WHERE mandt = mandt AND plant           = plant
+                                                          AND jabil_mat_no    = jabil_mat_no
+                                                          AND warehouse_code  = warehouse_code
+                                                          AND warehouse_loc   = warehouse_loc
+                                                          AND batch_no        = batch_no ).
+
+        IF t_exist IS NOT INITIAL.
+         TRY.
+                  t_final = VALUE #( FOR <fs_tab> IN t_tab_tmp
+                                              LET lv_qty = VALUE #( t_exist[ mandt           = <fs_tab>-mandt
+                                                                               plant           = <fs_tab>-plant
+                                                                               jabil_mat_no    = <fs_tab>-jabil_mat_no
+                                                                               warehouse_code  = <fs_tab>-warehouse_code
+                                                                               warehouse_loc   = <fs_tab>-warehouse_loc
+                                                                               batch_no        = <fs_tab>-batch_no ]-daily_inventory OPTIONAL ) 
+                                                               IN initial_inventory = <fs_tab>-daily_inventory
+                                                                  item_no         = <fs_tab>-item_no
+                                                                  product_name    = <fs_tab>-product_name
+                                                                  daily_inventory = lv_qty
+                                                                  changed_by   = sy-uname
+                                                                  changed_date = sy-datum
+                                                                  changed_time = sy-uzeit
+                                                                      ( mandt           = <fs_tab>-mandt
+                                                                        plant           = <fs_tab>-plant
+                                                                        jabil_mat_no    = <fs_tab>-jabil_mat_no
+                                                                        warehouse_code  = <fs_tab>-warehouse_code
+                                                                        warehouse_loc   = <fs_tab>-warehouse_loc
+                                                                        batch_no        = <fs_tab>-batch_no ) ). 
+                   ELSE.
+                     t_final = VALUE #( FOR <fs_tab> IN t_tab_tmp
+                                              LET lv_qty = VALUE #( t_exist[ mandt           = <fs_tab>-mandt
+                                                                               plant           = <fs_tab>-plant
+                                                                               jabil_mat_no    = <fs_tab>-jabil_mat_no
+                                                                               warehouse_code  = <fs_tab>-warehouse_code
+                                                                               warehouse_loc   = <fs_tab>-warehouse_loc
+                                                                               batch_no        = <fs_tab>-batch_no ]-daily_inventory OPTIONAL )                            
+                                              IN daily_inventory = lv_qty initial_inventory = <fs_tab>-initial_inventory
+                                                 ckd_material_receiving = <fs_tab>-ckd_material_receiving
+                                                 wo_material_consumption = <fs_tab>-wo_material_consumption
+                                                 wo_warehousing = <fs_tab>-wo_warehousing localbuy_material_receiving = <fs_tab>-localbuy_material_receiving
+                                                 localbuy_material_return = <fs_tab>-localbuy_material_return
+                                                 jabil_shipping_to_npt_mg_out = <fs_tab>-jabil_shipping_to_npt_mg_out
+                                                 npt_mg_return_to_jabil_in = <fs_tab>-npt_mg_return_to_jabil_in
+                                                 jabil_misc_out = <fs_tab>-jabil_misc_out  jabil_misc_in = <fs_tab>-jabil_misc_in
+                                                 movements_data_within_jabil_ou = <fs_tab>-movements_data_within_jabil_ou
+                                                 movements_data_within_jabil_in = <fs_tab>-movements_data_within_jabil_in
+                                                 difference = <fs_tab>-difference  balance = <fs_tab>-balance
+                                                 item_no = <fs_tab>-item_no product_name    = <fs_tab>-product_name
+                                                 changed_by   = sy-uname changed_date = sy-datum changed_time = sy-uzeit
+                                                     ( mandt           = <fs_tab>-mandt
+                                                       plant           = <fs_tab>-plant
+                                                       jabil_mat_no    = <fs_tab>-jabil_mat_no
+                                                       warehouse_code  = <fs_tab>-warehouse_code
+                                                       warehouse_loc   = <fs_tab>-warehouse_loc
+                                                       batch_no        = <fs_tab>-batch_no ) ).
+                  ENDIF.
+               CATCH cx_sy_range_out_of_bounds.
+             ENDTRY.
+
+          t_final = VALUE #( FOR <fs_tab> IN lt_aggr
+                             LET lv_qty = VALUE #( lt_aggr[ mandt = <fs_tab>-mandt
+                                                            plant           = <fs_tab>-plant
+                                                            jabil_mat_no    = <fs_tab>-jabil_mat_no
+                                                            warehouse_code  = <fs_tab>-warehouse_code
+                                                            warehouse_loc   = <fs_tab>-warehouse_loc
+                                                            batch_no        = <fs_tab>-batch_no ]-daily_inventory OPTIONAL )                                   
+                                        IN  daily_inventory = lv_qty
+                                            item_no         = <fs_tab>-item_no
+                                            product_name    = <fs_tab>-product_name
+                                            changed_by   = sy-uname
+                                            changed_date = sy-datum
+                                            changed_time = sy-uzeit
+                                                          ( mandt = <fs_tab>-mandt
+                                                            plant           = <fs_tab>-plant
+                                                            jabil_mat_no    = <fs_tab>-jabil_mat_no
+                                                            warehouse_code  = <fs_tab>-warehouse_code
+                                                            warehouse_loc   = <fs_tab>-warehouse_loc
+                                                            batch_no        = <fs_tab>-batch_no ) ).
+*****************************************************************************************************************************************************************************
+          t_tab_tmp[] = CORRESPONDING #( lt_tab1[] ).
+           t_final_edi = FILTER #( t_tab_tmp USING KEY sort_key EXCEPT IN lt_aggr WHERE  mandt = mandt AND plant = plant
+                                                         AND jabil_mat_no = jabil_mat_no
+                                                         AND warehouse_code = warehouse_code
+                                                         AND warehouse_loc = warehouse_loc
+                                                         AND batch_no = batch_no  ).
+        
+         t_final1 = VALUE #( FOR <fs_final_edi> IN t_final_edi
+                                    initial_inventory = <fs_final_edi>-daily_inventory
+                                    daily_inventory = 0 
+                                    product_name    = <fs_final_edi>-product_name
+                                    item_no         = <fs_final_edi>-item_no
+                                    changed_by   = sy-uname
+                                    changed_date = sy-datum
+                                    changed_time = sy-uzeit  ( mandt = <fs_final_edi>-mandt
+                                                              plant           = <fs_final_edi>-plant
+                                                              jabil_mat_no    = <fs_final_edi>-jabil_mat_no
+                                                              warehouse_code  = <fs_final_edi>-warehouse_code
+                                                              warehouse_loc   = <fs_final_edi>-warehouse_loc
+                                                              batch_no        = <fs_final_edi>-batch_no ) ).
+
