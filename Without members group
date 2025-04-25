@@ -1,0 +1,8 @@
+WITHOUT MEMBERS – Get unique values without requirement to loop on group members.
+
+LOOP AT bookings INTO DATA(booking_gr)
+                 GROUP BY ( carrid = booking_gr-carrid )
+                 WITHOUT MEMBERS
+                 REFERENCE INTO DATA(booking_gr_2).
+  WRITE: / booking_gr_2->carrid.
+ENDLOOP.
