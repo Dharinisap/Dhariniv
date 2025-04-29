@@ -1,0 +1,4 @@
+Produces a date with different date formats.
+
+cl_demo_output=>display(
+  |{ sy-datlo COUNTRY = 'DE ' }\n{ sy-datlo COUNTRY = 'US ' }| ).
