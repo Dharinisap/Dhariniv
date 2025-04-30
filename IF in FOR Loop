@@ -1,0 +1,60 @@
+IF Condtion inside loop 
+
+LOOP AT lt_header INTO DATA(lw_header).
+
+TRY.
+DATA(lw_status_h) = lt_status_h[ sd_doc = lw_header-doc_number ].
+IF lw_status_h-totstatcch = gc_cmgstb.
+lw_output_h-cred_stat = gc_cmgsty.
+ELSE.
+lw_output_h-cred_stat = lw_status_h-totstatcch.
+ENDIF.
+CATCH cx_sy_itab_line_not_found.
+ENDTRY.
+
+ENDLOOP.
+
+NEW: 
+lw_output_h-cred_stat = REDUCE #(
+      INIT cred_stat TYPE i
+      FOR lw_header IN lt_header
+      NEXT cred_stat = COND #(
+            LET lw_status_h = VALUE #( lt_status_h[ sd_doc = lw_header-doc_number ] OPTIONAL ) IN
+            WHEN lw_status_h IS INITIAL
+            THEN cred_stat
+            ELSE COND #(
+                  WHEN lw_status_h-totstatcch = gc_cmgstb
+                  THEN gc_cmgsty
+                  ELSE lw_status_h-totstatcch ) ) ).
+
+
+*************************************************************************************************************
+
+TYPES : BEGIN OF ty_cond,
+          kbetr TYPE decfloat16,
+          kwert TYPE decfloat16,
+        END OF ty_cond,
+        BEGIN OF ty_output_h,
+          discount  TYPE decfloat16,
+          surcharge TYPE decfloat16,
+        END OF ty_output_h.
+DATA: lw_output_h TYPE ty_output_h,
+      lt_cond     TYPE STANDARD TABLE OF ty_cond.
+
+lt_cond = VALUE #( ( kbetr = -5 kwert = 10 ) ( kbetr = +5 kwert = 20 ) ( kbetr = -5 kwert = 40 ) ).
+
+lw_output_h-discount = REDUCE #(
+    INIT discount TYPE decfloat16
+    FOR <lw_cond> IN lt_cond
+    NEXT discount = COND #( WHEN <lw_cond>-kbetr LT 0
+        THEN discount + <lw_cond>-kwert
+        ELSE discount ) ).
+
+lw_output_h-surcharge = REDUCE #(
+    INIT surcharge TYPE decfloat16
+    FOR <lw_cond> IN lt_cond
+    NEXT surcharge = COND #( WHEN <lw_cond>-kbetr GT 0
+        THEN surcharge + <lw_cond>-kwert
+        ELSE surcharge ) ).
+
+assert lw_output_h = VALUE ty_output_h( discount = 50 surcharge = 20 ).
