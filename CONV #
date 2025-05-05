@@ -1,0 +1,11 @@
+"Old way
+DATA : text   TYPE c LENGTH 255,
+       helper TYPE string,
+       xstr   TYPE xstring.
+
+helper = text   .   "Move to helper variable
+xstr   = cl_abap_codepage=>convert_to( source = helper ).
+
+"New way
+DATA : text TYPE c LENGTH 255.
+DATA(xstr) = cl_abap_codepage=>convert_to( source = CONV #( text ) ).
