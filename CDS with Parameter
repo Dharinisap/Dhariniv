@@ -1,0 +1,231 @@
+Scenario 1: CDS View With parameter
+Here we will be creating CDS view with parameter.
+
+@AbapCatalog.sqlViewName: 'Z_XXXX_V1'                     // SQL View Name
+@AbapCatalog.compiler.compareFilter: true
+@AbapCatalog.preserveKey: true
+@AccessControl.authorizationCheck: #CHECK
+@VDM.viewType: #CONSUMPTION
+@Analytics.query: true
+@Analytics.dataExtraction.enabled: true
+@EndUserText.label: 'Consumption view'
+
+define view ZCDS_C_XXXX                                     // Defining CDS View
+with parameters
+@EndUserText.label: 'Service Order Type'
+P_OrderType : abap.char( 4 )                              // Parameter name & Type
+
+as select from ZCDS_I_XXXX (P_OType:$parameters.P_OrderType) // Passing parameter value to composite view
+
+{
+    @AnalyticsDetails.query.axis: #ROWS   
+    key aXYZ,
+    @EndUserText.label: 'Service Order Type'
+    @AnalyticsDetails.query.axis: #ROWS
+    OrderType
+  
+}
+
+Generating Input help: Let’s have look at CDS view to identify how Value help is generated 
+We have added annotation @Consumption.valuehelpDefination: at parameter level to get input help. Name & element helped us to connect with input help fields from CDS view ZCDS_XXXX_Value_Help.
+
+We have not added any other association related ZCDS_XXXX_Value_Help in Consumption / composite / interface views.
+define view ZCDS_C_XXXX                                // CDS View Name
+with parameters                         
+@Consumption.valueHelpDefinition:                    // Annotation to link parameter with CDS view which will help to generate Text
+[ {
+    entity: { name: 'ZCDS_XXXX_Value_Help',
+              element: 'OrderType'}
+  }]
+@EndUserText.label: 'Service Order Type'
+P_OrderType : abap.char( 4 )
+
+as select from ZCDS_I_XXXX (P_OType:$parameters.P_OrderType)
+
+{
+    @AnalyticsDetails.query.axis: #ROWS   
+    key aXYZ,
+    @EndUserText.label: 'Service Order Type'
+    @AnalyticsDetails.query.axis: #ROWS
+    @AnalyticsDetails.query.display: #KEY_TEXT
+    OrderType
+  
+}
+
+define view ZCDS_C_XXXX                                // CDS View Name
+with parameters                         
+@Consumption.valueHelpDefinition:                    // Annotation to link parameter with CDS view which will help to generate Text
+[ {
+    entity: { name: 'ZCDS_XXXX_Value_Help',
+              element: 'OrderType'}
+  }]
+@EndUserText.label: 'Service Order Type'
+P_OrderType : abap.char( 4 )
+
+as select from ZCDS_I_XXXX (P_OType:$parameters.P_OrderType)
+
+{
+    @AnalyticsDetails.query.axis: #ROWS   
+    key aXYZ,
+    @EndUserText.label: 'Service Order Type'
+    @AnalyticsDetails.query.axis: #ROWS
+    @AnalyticsDetails.query.display: #KEY_TEXT
+    OrderType
+  
+}
+
+
+Method 2:
+
+In this method we are not creating CDS with parameters but we are going to use annotation @consumption.filter.mandatory : True . This annotation will give us prompts same as parameter.
+
+@AbapCatalog.sqlViewName: 'Z_XXXX_V1'
+@AbapCatalog.compiler.compareFilter: true
+@AbapCatalog.preserveKey: true
+@AccessControl.authorizationCheck: #CHECK
+@VDM.viewType: #CONSUMPTION
+@Analytics.query: true
+@Analytics.dataExtraction.enabled: true
+@EndUserText.label: 'Consumption view'
+define view ZCDS_C_XXXX as select from ZCDS_I_XXXX
+{
+    @AnalyticsDetails.query.axis: #ROWS   
+    key aXYZ,
+    @Consumption.Filter.mandatory : True           // Annotation for input prompts
+    @Consumption.valueHelp : '_ValueHelp.aXXXX'    // Annotation to link with CDS view which will generate text
+    @EndUserText.label: 'Service Order Type'
+    @AnalyticsDetails.query.axis: #ROWS
+    @AnalyticsDetails.query.display: #KEY_TEXT
+    OrderType
+}
+
+Here we can see that F4 help is also enabled and it has happened because of annotation @Consumption.ValueHelp.
+
+When we use this annotation then we must provide connection to our association in Consumption view.
+
+@Consumption.ValueHelp: ‘_ValueHelp.aXXXX’
+
+Here ‘_ValueHelp’ is association name and ‘aXXXX' is field on which we are generating value help.
+
+Let’s have a look at composite View.
+
+Here we have created association with CDS view from which we are generating Value help. In addition to this, we have mentioned 3 annotations above order type. We must use those annotation if we are generating value help in parameter.
+@AbapCatalog.sqlViewName: 'ZVM_XXX_A1'
+@AbapCatalog.compiler.compareFilter: true
+@AbapCatalog.preserveKey: true
+@AccessControl.authorizationCheck: #NOT_REQUIRED
+@Analytics.dataCategory: #CUBE
+@VDM.viewType: #COMPOSITE
+@EndUserText.label: 'Parameter based CDS view'
+define view ZCDS_I_XXXX
+as select from aXXX_Table
+association [0..1] to ZCDS_XXXX_Value_Help as _ValueHelp 
+                    on $projection.OrderType = _ValueHelp.OrderType
+{
+    key aXYZ,
+    @Search.defaultSearchElement: true
+    @Search.fuzzinessThreshold: 0.8
+    @ObjectModel.foreignKey.association: '_ValueHelp' 
+    aXXXX as OrderType,
+    
+    //Association
+    _ValueHelp
+ 
+} 
+
+@ObjectModel.Foreignkey.association will work with primary key of CDS view used in association.
+
+Alternative way to achieve this will be as follow -
+
+i)  In composite view use @ObjectModel.Text.Association annotation & provide direct mapping to Text View.
+
+ii) In Consumption view use @Consumption.valueHelp: annotation.
+
+Advantage : With this method, there will be no need of dimension view while generating input help.
+
+
+
+Scenario 2: Parameters with multiple Selection
+
+If we want to allow user to select multiple inputs, then use annotation below at consumption level.
+@Consumption.filter.multipleSelections: true 
+
+Sample Code -
+define view ZCDS_C_XXXX as select from ZCDS_I_XXXX
+{
+    @AnalyticsDetails.query.axis: #ROWS   
+    key aXYZ,
+    @Consumption.Filter.mandatory : True
+    @Consumption.Filter.MultipleSelections : True       // Annotation to enable multiple selection
+    @Consumption.valueHelp : '_ValueHelp.aXXXX'
+    @EndUserText.label: 'Service Order Type'
+    @AnalyticsDetails.query.axis: #ROWS
+    @AnalyticsDetails.query.display: #KEY_TEXT
+    OrderType
+}
+
+This will give us option to have multiple selection. User can choose & pass multiple inputs to report.
+
+
+
+Scenario 3: Parameter with range option
+If we face scenario where we need option to have range selection screen, then we can use below annotation in Consumption view.
+@Consumption.filter.mandatory: True
+@Consumption.filter.selectionType: #RANGE
+
+Writing code to generate Value help-
+
+Till now we have seen multiple options to generate parameters & F4 help for it. Now let’s have look at CDS view in which we have generated value help. Highlighting annotations which are important in both CDS views.
+
+CDS view used for Value help association
+1.	CDS view used for Value help association
+
+@AbapCatalog.sqlViewName: 'ZXXXXX'				// SQL View Name
+@AbapCatalog.compiler.compareFilter: true
+@AbapCatalog.preserveKey: true
+@AccessControl.authorizationCheck: #NOT_REQUIRED
+@Analytics.dataCategory: #DIMENSION
+@VDM.viewType: #BASIC
+@Search.searchable: true
+@EndUserText.label: 'Value Help'
+define view ZCDS_XXXXX_Value_Help as select from tXXXX 		// CDS View Name and Source Table
+association [0..1] to ZCDS_XXXXX_TEXT as _TEXT 			// CDS View from which we will fetch text value
+                on $projection.OrderType = _TEXT.OrderType
+{
+    @Search.defaultSearchElement: true
+    key aXXXX as OrderType,
+    //Association
+    _TEXT
+}
+
+CDS view for Text
+2.	CDS view for Text
+
+@AbapCatalog.sqlViewName: 'ZXXXXTEXT1'
+@AbapCatalog.compiler.compareFilter: true
+@AbapCatalog.preserveKey: true
+@AccessControl.authorizationCheck: #NOT_REQUIRED
+@VDM.viewType: #BASIC
+@ObjectModel.dataCategory: #TEXT
+@Search.searchable: true
+@EndUserText.label: 'Value Help Text'
+define view ZCDS_XXXXX_TEXT as select from tXXX01 		// CDS View to generate text
+{
+   key aXXXX   as OrderType,					// Key Field
+    @Semantics.text: true
+    @Search.defaultSearchElement: true
+    @Search.fuzzinessThreshold: 0.8
+    txt     as OrderTypeText					// Text Field
+} where spras = 'E'
+
+
+If we define txt field as Key in CDS view then text will not appear in F4 help.
+define view ZCDS_XXXXX_TEXT as select from tXXX01 		// CDS View to generate text
+{
+   key aXXXX   as OrderType,					// Key Field
+    @Semantics.text: true
+    @Search.defaultSearchElement: true
+    @Search.fuzzinessThreshold: 0.8
+   Key txt     as OrderTypeText					// Text Field as Key 
+} 
+
